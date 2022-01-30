@@ -100,7 +100,7 @@ Resources:
 
   # --- BEGIN PIPELINE INFRASTRUCTURE ---
 
-  JobDataPipelineLoader:
+  DataPipeline:
     Type: AWS::StepFunctions::StateMachine
     Properties:
       DefinitionString:
