@@ -1,0 +1,103 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+
+Metadata: 
+  License: Apache-2.0
+Description: 'AWS CloudFormation to create MyAPP Infrastructure'
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  S3BucketData:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  MyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 7
+
+  ScriptOkTopic:
+    Type: AWS::SNS::Topic
+
+  MyEC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: "ami-0a8b4cd432b1c3063"
+      InstanceType: "t2.micro"
+      InstanceInitiatedShutdownBehavior: "stop"
+      IamInstanceProfile: "LabInstanceProfile"
+      KeyName: "tts"
+      UserData:
+          Fn::Base64: !Join
+            - ''
+            - - !Sub |
+                  #!/bin/bash
+                  yum search deltarpm
+                  yum info deltarpm
+                  yum install -q -y deltarpm
+                  yum -q -y update
+                  yum install -q -y awslogs
+                  echo "[/tmp/mylog/myapplog.out]" >> /etc/awslogs/awslogs.conf
+                  echo "file = /tmp/mylog/myapplog.out" >> /etc/awslogs/awslogs.conf
+                  echo "log_group_name = ${MyLogGroup}" >> /etc/awslogs/awslogs.conf
+                  echo "log_stream_name = {instance_id}/myapp.log" >> /etc/awslogs/awslogs.conf
+                  echo "datetime_format = %d/%b/%Y:%H:%M:%S" >> /etc/awslogs/awslogs.conf
+                  systemctl start awslogsd
+                  mkdir /tmp/mylog
+                  echo "My App" > /tmp/mylog/myapplog.out
+                  curl https://raw.githubusercontent.com/mauropelucchi/tts-cloud-scripting-2022/main/data/data100k.csv.zip -o data.zip >> /tmp/mylog/myapplog.out
+                  unzip data.zip >> /tmp/mylog/myapplog.out
+                  cat data100k.csv | wc -l >> /tmp/mylog/myapplog.out
+                  aws s3 ls s3://${S3BucketData} >> /tmp/mylog/myapplog.out
+                  aws s3 cp data.zip s3://${S3BucketData}/data.zip >> /tmp/mylog/myapplog.out
+                  shutdown -h +10
+                  
+
+  # --- BEGIN PIPELINE INFRASTRUCTURE ---
+
+  JobDataPipelineLoader:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        !Sub |
+          {
+            "Comment": "My App State machine",
+            "StartAt": "LaunchScript",
+            "States": {
+              "LaunchScript": {
+                "Type": "Task",
+                "Parameters": {
+                  "InstanceIds": [
+                    "${MyEC2}"
+                  ]
+                },
+                "Resource": "arn:aws:states:::aws-sdk:ec2:startInstances",
+                "Next": "Send notification"
+              },
+              "Send notification": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sns:publish",
+                "Parameters": {
+                  "Message": {
+                    "data_ready": "ok"
+                  },
+                  "TopicArn": "${ScriptOkTopic}"
+                },
+                "ResultPath": null,
+                "End": true
+              }
+            }
+          }
+      RoleArn: "arn:aws:iam::288291355943:role/LabRole"
+      StateMachineType: STANDARD
+
+Outputs:
+  S3BucketName:
+    Value: S3Bucket 
+    Description: Bucket Name
+  S3BucketData:
+    Value: S3Bucket 
+    Description: Bucket Name
