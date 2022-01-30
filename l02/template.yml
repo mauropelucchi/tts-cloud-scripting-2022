@@ -5,14 +5,43 @@ Metadata:
   License: Apache-2.0
 Description: 'AWS CloudFormation to create MyAPP Infrastructure'
 
+Parameters:
+  DataBucketName:
+    Description: "The name of the S3 bucket used for the data"
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: "^([a-z0-9]+\\-?)+[a-z0-9]+$"
+    ConstraintDescription: "must be a valid s3 bucket name, without periods"
+
+
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - 
+        Label:
+          default: "Stack settings"
+        Parameters:
+          - DataBucketName
+    ParameterLabels:
+      DataBucketName:
+        default: "data bucket name"
+
+
 Resources:
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
 
   S3BucketData:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref DataBucketName
+      DeletionPolicy: Retain
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
 
   MyLogGroup:
     Type: AWS::Logs::LogGroup
@@ -53,7 +82,7 @@ Resources:
                   cat data100k.csv | wc -l >> /tmp/mylog/myapplog.out
                   aws s3 ls s3://${S3BucketData} >> /tmp/mylog/myapplog.out
                   aws s3 cp data.zip s3://${S3BucketData}/data.zip >> /tmp/mylog/myapplog.out
-                  shutdown -h +10
+                  shutdown -h now
                   
 
   # --- BEGIN PIPELINE INFRASTRUCTURE ---
