@@ -1,5 +1,6 @@
 {
-    "Parameters": {
-      "DataBucketName": "tts-2020-data"
-    }
+  "Parameters": {
+    "DataBucketName": "tts-2020-data",
+    "Enable": "true"
+  }
 }
