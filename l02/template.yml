@@ -13,6 +13,14 @@ Parameters:
     MaxLength: 63
     AllowedPattern: "^([a-z0-9]+\\-?)+[a-z0-9]+$"
     ConstraintDescription: "must be a valid s3 bucket name, without periods"
+  Enable:
+    Default: true
+    Description: "Specifies whether copy data are enabled"
+    Type: String
+    AllowedValues:
+      - true
+      - false
+    ConstraintDescription: "must be true or false"
 
 
 
@@ -23,11 +31,13 @@ Metadata:
         Label:
           default: "Stack settings"
         Parameters:
-          - DataBucketName
+          - DataBucketName 
+          - Enable
     ParameterLabels:
       DataBucketName:
         default: "data bucket name"
-
+      Enable:
+        default: "Enable?"
 
 Resources:
 
@@ -35,7 +45,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref DataBucketName
-      DeletionPolicy: Retain
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -81,7 +90,10 @@ Resources:
                   unzip data.zip >> /tmp/mylog/myapplog.out
                   cat data100k.csv | wc -l >> /tmp/mylog/myapplog.out
                   aws s3 ls s3://${S3BucketData} >> /tmp/mylog/myapplog.out
-                  aws s3 cp data.zip s3://${S3BucketData}/data.zip >> /tmp/mylog/myapplog.out
+                  echo ${Enable} >> /tmp/mylog/myapplog.out
+                  "aws s3 cp data.zip s3://${S3BucketData}/data.zip" > myscript.sh
+                  chmod +x myscript.sh
+                  if [ ${Enable} -eq true ]; then ./myscript.sh fi >> /tmp/mylog/myapplog.out
                   shutdown -h now
                   
 
