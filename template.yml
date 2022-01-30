@@ -14,6 +14,13 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
 
+  MyPipelineStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "pipeline.yml"
+      Parameters:
+        S3BucketData: !Ref S3BucketData
+
 Outputs:
   S3BucketName:
     Value: S3Bucket 

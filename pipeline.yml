@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+
+Description: >
+  Pipeline template to run and destroy a EC2 instance
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  S3BucketData:
+    Description: "The name of the S3 bucket with the data"
+    Type: String
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: "^([a-z0-9]+\\-?)+[a-z0-9]+$"
+    ConstraintDescription: "must be a valid s3 bucket name, without periods"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Environment settings"
+        Parameters:
+          - S3BucketData
+    ParameterLabels:
+      S3BucketData:
+        default: "Data bucket name"
+
+Resources:
+
+  MyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 7
+
+  MyEC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: "ami-0a8b4cd432b1c3063"
+      InstanceType: "c5.xlarge"
+      UserData:
+          Fn::Base64: !Join
+            - ''
+            - - !Sub |
+                  #!/bin/bash
+                  yum search deltarpm
+                  yum info deltarpm
+                  yum install -q -y deltarpm
+                  yum -q -y update
+                  yum install -q -y awslogs
+                  yum -q -y install curl jq python37-pip python37 python37-setuptools aws-apitools-common
+                  export AWS_DEFAULT_REGION="${AWS::Region}"
+                  echo "[/tmp/myapplog.out]" >> /etc/awslogs/awslogs.conf
+                  echo "file = /tmp/myapplog.out" >> /etc/awslogs/awslogs.conf
+                  echo "log_group_name = ${MyLogGroup}" >> /etc/awslogs/awslogs.conf
+                  echo "log_stream_name = {instance_id}/myapp.log" >> /etc/awslogs/awslogs.conf
+                  echo "datetime_format = %d/%b/%Y:%H:%M:%S" >> /etc/awslogs/awslogs.conf
+                  systemctl start awslogsd
+                  echo "My App" > /tmp/myapplog.out
+                  wget http://www.google.it > /tmp/myapplog.out
+                  
+
+  # --- BEGIN PIPELINE INFRASTRUCTURE ---
+
+  JobDataPipelineLoader:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        !Sub |
+          {
+            "Comment": "My App State machine",
+            "StartAt": "StartInstances",
+            "States": {
+              "StartInstances": {
+                "Type": "Task",
+                "Parameters": {
+                  "InstanceIds": [
+                    "${MyEC2}"
+                  ]
+                },
+                "Resource": "arn:aws:states:::aws-sdk:ec2:startInstances",
+                "Next": "StopInstances"
+              },
+              "StopInstances": {
+                "Type": "Task",
+                "End": true,
+                "Parameters": {
+                  "InstanceIds": [
+                    "${MyEC2}"
+                  ]
+                },
+                "Resource": "arn:aws:states:::aws-sdk:ec2:stopInstances"
+              }
+            }
+          }
+      RoleArn: "arn:aws:iam::288291355943:role/LabRole"
+      StateMachineType: STANDARD
+
