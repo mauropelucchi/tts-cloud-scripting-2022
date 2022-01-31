@@ -95,6 +95,7 @@ Resources:
                   chmod +x /etc/init.d/myscript.sh
                   echo  "@reboot /etc/init.d/myscript.sh" > crontabnew
                   crontab crontabnew
+                  shutdown -h now
                   
 
   # --- BEGIN PIPELINE INFRASTRUCTURE ---
