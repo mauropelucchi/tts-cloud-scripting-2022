@@ -3,130 +3,25 @@ AWSTemplateFormatVersion: '2010-09-09'
 
 Metadata: 
   License: Apache-2.0
-Description: 'AWS CloudFormation to create MyAPP Infrastructure'
-
-Parameters:
-  DataBucketName:
-    Description: "The name of the S3 bucket used for the data"
-    Type: String
-    MinLength: 3
-    MaxLength: 63
-    AllowedPattern: "^([a-z0-9]+\\-?)+[a-z0-9]+$"
-    ConstraintDescription: "must be a valid s3 bucket name, without periods"
-
-
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterGroups:
-      - 
-        Label:
-          default: "Stack settings"
-        Parameters:
-          - DataBucketName
-    ParameterLabels:
-      DataBucketName:
-        default: "data bucket name"
-
+Description: 'AWS CloudFormation Sample Template S3_Website_Bucket_With_Retain_On_Delete:
+  Sample template showing how to create a publicly accessible S3 bucket configured
+  for website access with a deletion policy of retain on delete. **WARNING** This
+  template creates an S3 bucket that will NOT be deleted when the stack is deleted.
+  You will be billed for the AWS resources used if you create a stack from this template.'
 
 Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
 
   S3BucketData:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
-    Properties:
-      BucketName: !Ref DataBucketName
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
-
-  MyLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      RetentionInDays: 7
-
-  ScriptOkTopic:
-    Type: AWS::SNS::Topic
-
-  MyEC2:
-    Type: AWS::EC2::Instance
-    Properties: 
-      ImageId: "ami-0a8b4cd432b1c3063"
-      InstanceType: "t2.micro"
-      InstanceInitiatedShutdownBehavior: "stop"
-      IamInstanceProfile: "LabInstanceProfile"
-      KeyName: "tts"
-      UserData:
-          Fn::Base64: !Join
-            - ''
-            - - !Sub |
-                  #!/bin/bash
-                  yum search deltarpm
-                  yum info deltarpm
-                  yum install -q -y deltarpm
-                  yum -q -y update
-                  yum install -q -y awslogs
-                  echo "[/tmp/mylog/myapplog.out]" >> /etc/awslogs/awslogs.conf
-                  echo "file = /tmp/mylog/myapplog.out" >> /etc/awslogs/awslogs.conf
-                  echo "log_group_name = ${MyLogGroup}" >> /etc/awslogs/awslogs.conf
-                  echo "log_stream_name = {instance_id}/myapp.log" >> /etc/awslogs/awslogs.conf
-                  echo "datetime_format = %d/%b/%Y:%H:%M:%S" >> /etc/awslogs/awslogs.conf
-                  systemctl start awslogsd
-                  mkdir /tmp/mylog
-                  echo "My App" > /tmp/mylog/myapplog.out
-                  curl https://raw.githubusercontent.com/mauropelucchi/tts-cloud-scripting-2022/main/data/data100k.csv.zip -o data.zip >> /tmp/mylog/myapplog.out
-                  unzip data.zip >> /tmp/mylog/myapplog.out
-                  cat data100k.csv | wc -l >> /tmp/mylog/myapplog.out
-                  aws s3 ls s3://${S3BucketData} >> /tmp/mylog/myapplog.out
-                  aws s3 cp data.zip s3://${S3BucketData}/data.zip >> /tmp/mylog/myapplog.out
-                  shutdown -h now
-                  
-
-  # --- BEGIN PIPELINE INFRASTRUCTURE ---
-
-  JobDataPipelineLoader:
-    Type: AWS::StepFunctions::StateMachine
-    Properties:
-      DefinitionString:
-        !Sub |
-          {
-            "Comment": "My App State machine",
-            "StartAt": "LaunchScript",
-            "States": {
-              "LaunchScript": {
-                "Type": "Task",
-                "Parameters": {
-                  "InstanceIds": [
-                    "${MyEC2}"
-                  ]
-                },
-                "Resource": "arn:aws:states:::aws-sdk:ec2:startInstances",
-                "Next": "Send notification"
-              },
-              "Send notification": {
-                "Type": "Task",
-                "Resource": "arn:aws:states:::sns:publish",
-                "Parameters": {
-                  "Message": {
-                    "data_ready": "ok"
-                  },
-                  "TopicArn": "${ScriptOkTopic}"
-                },
-                "ResultPath": null,
-                "End": true
-              }
-            }
-          }
-      RoleArn: "arn:aws:iam::288291355943:role/LabRole"
-      StateMachineType: STANDARD
 
 Outputs:
   S3BucketName:
     Value: S3Bucket 
     Description: Bucket Name
-  S3BucketData:
-    Value: S3Bucket 
-    Description: Bucket Name
+  S3BucketNameData:
+    Value: S3BucketData 
+    Description: Bucket Name (data)
