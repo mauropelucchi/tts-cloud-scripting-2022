@@ -1,0 +1,15 @@
+function handler () {
+    EVENT_DATA=$1
+    curl https://raw.githubusercontent.com/mauropelucchi/tts-cloud-scripting-2022/main/data/data10k.csv -o /tmp/data10k.csv
+    
+
+    # cat /tmp/data10k.csv | wc -l
+    TOTAL_LINES=$(cat /tmp/data10k.csv | wc -l)
+
+    HTTP_CONNECT_LINES=$(cat /tmp/data10k.csv | grep HTTP_CONNECT | wc -l)
+
+
+
+    RESPONSE="{\"statusCode\": 200, \"body\": {\"number_of_lines\": $TOTAL_LINES, \"http_connect_lines\": $HTTP_CONNECT_LINES}}"
+    echo $RESPONSE
+}
